@@ -4,7 +4,57 @@ import itertools
 import operator
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional, Union
+
+
+def _find_file_in_ipts(data_base: str, candidates: list, timeout: int = 30) -> Optional[str]:
+    """Search for candidate filenames across all IPTS dirs using parallel isfile checks.
+
+    On sshfs mounts a glob with a wildcard at the IPTS level must enumerate every directory,
+    which can take over a minute.  Checking os.path.isfile for a specific filename in each
+    IPTS dir takes ~0.2 s per call but runs in parallel so the whole search completes in
+    1-5 s regardless of how many IPTS directories exist.
+
+    :param data_base: Instrument root, e.g. '/SNS/REF_M'
+    :param candidates: Ordered list of (subdir, filename) tuples, e.g.
+        [('nexus', 'REF_M_40205.nxs.h5'), ('data', 'REF_M_40205_event.nxs')].
+        The first tuple whose file exists in any IPTS dir wins.
+    :param timeout: Wall-clock timeout in seconds (default 30)
+    :returns: Absolute path string or None
+    """
+    try:
+        all_entries = os.listdir(data_base)
+    except OSError:
+        return None
+    ipts_dirs = [d for d in all_entries if d.startswith("IPTS")]
+    if not ipts_dirs:
+        return None
+
+    def check(ipts_dir):
+        for subdir, filename in candidates:
+            path = os.path.join(data_base, ipts_dir, subdir, filename)
+            try:
+                if os.path.isfile(path):
+                    return path
+            except OSError:
+                pass
+        return None
+
+    found = None
+    try:
+        with ThreadPoolExecutor(max_workers=20) as executor:
+            futs = {executor.submit(check, d): d for d in ipts_dirs}
+            for fut in as_completed(futs, timeout=timeout):
+                res = fut.result()
+                if res:
+                    found = res
+                    for f in futs:
+                        f.cancel()
+                    break
+    except Exception:
+        pass
+    return found
 
 
 class RunNumbers(object):

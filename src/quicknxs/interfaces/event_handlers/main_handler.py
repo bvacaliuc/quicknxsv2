@@ -731,7 +731,7 @@ class MainHandler:
         if self.ui.histogramActive.isChecked():
             filter_ = "All (*.*);;histo.nxs (*histo.nxs)"
         else:
-            filter_ = "All (*.*);;nxs.h5 (*nxs.h5);;event.nxs (*event.nxs)"
+            filter_ = "nxs.h5 (*.nxs.h5);;Legacy Event (*event.nxs);;All (*.*)"
 
         file_path = getattr(self, dialog_opening_method)(filter_=filter_)
 
@@ -764,24 +764,26 @@ class MainHandler:
         self.main_window.auto_change_active = True
         if number is None:
             number = str(self.ui.numberSearchEntry.text())  # cast from unicode to string
-        if number == "":
+        if not number or not str(number).strip():
             self.report_message("No run number entered", pop_up=True)
             return
         QtWidgets.QApplication.instance().processEvents()
         run_numbers = RunNumbers(number)
         file_list = list()
-        # Look for new-style nexus file name
         configuration = self.get_configuration_from_ui()
-        for run_number in run_numbers.numbers:
-            search_string = configuration.instrument.file_search_template % run_number
-            matches = glob.glob(search_string + ".nxs.h5")  # type: Optional[List[str]]
-            if not matches:  # Look for old-style nexus file name
-                search_string = configuration.instrument.legacy_search_template % run_number
-                matches = glob.glob(search_string + "_event.nxs")
-            if not matches:
-                self.report_message("Could not locate run number %s" % run_number, pop_up=True)
-                return
-            file_list.append(matches[0])  # there should be only one match, since we query with one run number
+        histogram = self.ui.histogramActive.isChecked()
+        QtWidgets.QApplication.instance().setOverrideCursor(QtCore.Qt.WaitCursor)
+        try:
+            for run_number in run_numbers.numbers:
+                self.report_message("Searching for run %s..." % run_number)
+                QtWidgets.QApplication.instance().processEvents()
+                file_path = configuration.instrument.locate_file(run_number, histogram=histogram)
+                if file_path is None:
+                    self.report_message("Could not locate run number %s" % run_number, pop_up=True)
+                    return
+                file_list.append(file_path)
+        finally:
+            QtWidgets.QApplication.instance().restoreOverrideCursor()
 
         self.ui.numberSearchEntry.setText("")  # empty the contents of in the LineEdit widget
         success = False

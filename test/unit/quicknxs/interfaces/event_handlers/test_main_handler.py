@@ -426,5 +426,70 @@ def test_stitch_reflectivity_updates_reduction_table(mocker, qtbot):
     assert handler.reduction_table.item(1, ReductionTableColumn.SCALE_FACTOR).text() == str(scale1)
 
 
+class TestOpenRunNumber:
+    """Tests for MainHandler.open_run_number() with mocked locate_file."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, qtbot):
+        self.main_window = MainWindow()
+        qtbot.addWidget(self.main_window)
+        self.handler = MainHandler(self.main_window)
+
+    def _patch_locate_file(self, mocker, return_value):
+        """Patch configuration.instrument.locate_file to return a fixed value."""
+        mock_instrument = mocker.MagicMock()
+        mock_instrument.locate_file.return_value = return_value
+        mock_conf = mocker.MagicMock()
+        mock_conf.instrument = mock_instrument
+        mocker.patch.object(self.handler, "get_configuration_from_ui", return_value=mock_conf)
+        return mock_instrument
+
+    def test_open_run_number_empty_string(self, mocker):
+        """Empty string input reports 'No run number' and returns without searching."""
+        mock_report = mocker.patch.object(self.handler, "report_message")
+        self.handler.open_run_number(number="")
+        mock_report.assert_called_once()
+        assert "No run number" in mock_report.call_args[0][0]
+
+    def test_open_run_number_whitespace_only(self, mocker):
+        """Whitespace-only string is treated like empty and reports 'No run number'."""
+        mock_report = mocker.patch.object(self.handler, "report_message")
+        self.handler.open_run_number(number="   ")
+        mock_report.assert_called_once()
+        assert "No run number" in mock_report.call_args[0][0]
+
+    def test_open_run_number_not_found(self, mocker):
+        """When locate_file returns None, reports 'Could not locate' and does not open."""
+        self._patch_locate_file(mocker, return_value=None)
+        mock_report = mocker.patch.object(self.handler, "report_message")
+        mock_open = mocker.patch.object(self.handler, "open_file")
+        self.handler.open_run_number(number="40205")
+        assert any("Could not locate" in c[0][0] or "not found" in c[0][0].lower() for c in mock_report.call_args_list)
+        mock_open.assert_not_called()
+
+    def test_open_run_number_found_opens_file(self, mocker):
+        """When locate_file returns a path, update_file_list and open_file are called."""
+        fake_path = "/SNS/REF_M/IPTS-1/nexus/REF_M_40205.nxs.h5"
+        self._patch_locate_file(mocker, return_value=fake_path)
+        mock_update = mocker.patch.object(self.handler, "update_file_list")
+        mock_open = mocker.patch.object(self.handler, "open_file")
+        result = self.handler.open_run_number(number="40205")
+        mock_update.assert_called_once()
+        mock_open.assert_called_once()
+        assert fake_path in mock_update.call_args[0][0]
+        assert fake_path in mock_open.call_args[0][0]
+        assert result is True
+
+    def test_open_run_number_clears_entry_on_success(self, mocker):
+        """On success, the numberSearchEntry text widget is cleared."""
+        fake_path = "/SNS/REF_M/IPTS-1/nexus/REF_M_40205.nxs.h5"
+        self._patch_locate_file(mocker, return_value=fake_path)
+        mocker.patch.object(self.handler, "update_file_list")
+        mocker.patch.object(self.handler, "open_file")
+        self.main_window.ui.numberSearchEntry.setText("40205")
+        self.handler.open_run_number(number="40205")
+        assert self.main_window.ui.numberSearchEntry.text() == ""
+
+
 if __name__ == "__main__":
     pytest.main([__file__])

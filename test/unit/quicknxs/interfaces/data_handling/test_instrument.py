@@ -4,7 +4,7 @@ import pytest
 from mantid.simpleapi import mtd
 
 from quicknxs.interfaces.configuration import Configuration
-from quicknxs.interfaces.data_handling.instrument import CrossSectionError
+from quicknxs.interfaces.data_handling.instrument import CrossSectionError, Instrument
 
 
 @pytest.mark.datarepo
@@ -211,3 +211,50 @@ def test_direct_beam_distance():
         slit3_width=3.0,
     )
     assert instrument.direct_beam_distance(scattering, direct_beam) == 12.0
+
+
+class TestLocateFile:
+    """Tests for Instrument.locate_file()."""
+
+    PATCH_TARGET = "quicknxs.interfaces.data_handling.instrument._find_file_in_ipts"
+
+    def test_locate_file_finds_h5(self, mocker):
+        """locate_file returns path when _find_file_in_ipts returns a path."""
+        expected = "/SNS/REF_M/IPTS-1/nexus/REF_M_40205.nxs.h5"
+        mocker.patch(self.PATCH_TARGET, return_value=expected)
+        instrument = Instrument()
+        result = instrument.locate_file(40205)
+        assert result == expected
+
+    def test_locate_file_not_found(self, mocker):
+        """locate_file returns None when _find_file_in_ipts returns None."""
+        mocker.patch(self.PATCH_TARGET, return_value=None)
+        instrument = Instrument()
+        result = instrument.locate_file(99999)
+        assert result is None
+
+    def test_locate_file_event_mode_candidates(self, mocker):
+        """For event mode (histogram=False), candidates include .nxs.h5 and _event.nxs."""
+        mock_find = mocker.patch(self.PATCH_TARGET, return_value=None)
+        instrument = Instrument()
+        instrument.locate_file(40205, histogram=False)
+        candidates = mock_find.call_args[0][1]
+        assert ("nexus", "REF_M_40205.nxs.h5") in candidates
+        assert ("data", "REF_M_40205_event.nxs") in candidates
+
+    def test_locate_file_histogram_candidates(self, mocker):
+        """For histogram=True, candidates list has only histo.nxs."""
+        mock_find = mocker.patch(self.PATCH_TARGET, return_value=None)
+        instrument = Instrument()
+        instrument.locate_file(40205, histogram=True)
+        candidates = mock_find.call_args[0][1]
+        assert len(candidates) == 1
+        assert candidates[0] == ("data", "REF_M_40205_histo.nxs")
+
+    def test_locate_file_uses_instrument_dir(self, mocker):
+        """locate_file passes self.instrument_dir as data_base."""
+        mock_find = mocker.patch(self.PATCH_TARGET, return_value=None)
+        instrument = Instrument()
+        instrument.locate_file(40205)
+        data_base = mock_find.call_args[0][0]
+        assert data_base == "/SNS/REF_M"

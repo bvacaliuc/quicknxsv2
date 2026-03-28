@@ -16,7 +16,7 @@ from mr_reduction.dead_time_correction import apply_dead_time_correction
 from mr_reduction.filter_events import split_error_events, split_events
 from mr_reduction.settings import PolarizationLogs
 
-from quicknxs.interfaces.data_handling.filepath import FilePath
+from quicknxs.interfaces.data_handling.filepath import FilePath, _find_file_in_ipts
 
 if TYPE_CHECKING:
     from quicknxs.interfaces.configuration import Configuration
@@ -124,6 +124,27 @@ class Instrument(object):
         self.pol_veto = "PolarizerVeto"
         self.ana_state = "AnalyzerState"
         self.ana_veto = "AnalyzerVeto"
+
+    def locate_file(self, run_number: int, histogram: bool = False, timeout: int = 30) -> Optional[str]:
+        """Find a data file by run number using parallel isfile checks across IPTS directories.
+
+        Avoids glob wildcards that cause ~80 s delays on sshfs mounts by checking
+        os.path.isfile for exact candidate paths in parallel across all IPTS directories.
+
+        :param run_number: Integer run number
+        :param histogram: If True, search for _histo.nxs files; if False (default), prefer
+            .nxs.h5 with _event.nxs as fallback
+        :param timeout: Per-search timeout in seconds (default 30)
+        :returns: Absolute path string or None
+        """
+        if histogram:
+            candidates = [("data", f"{self.instrument_name}_{run_number}_histo.nxs")]
+        else:
+            candidates = [
+                ("nexus", f"{self.instrument_name}_{run_number}.nxs.h5"),
+                ("data", f"{self.instrument_name}_{run_number}_event.nxs"),
+            ]
+        return _find_file_in_ipts(self.instrument_dir, candidates, timeout=timeout)
 
     def _get_xs_list(self, file_path: str, ws_root_name: str, configuration: "Configuration") -> list[EventWorkspace]:
         """Load the cross-sections from a data file. Handles both pre- and post-epics data.
