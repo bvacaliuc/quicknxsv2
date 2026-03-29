@@ -99,6 +99,22 @@ Plot types and their matplotlib storage:
 
 Critical: off-specular data uses `shading="gouraud"` with **irregular 2D coordinate grids** — each pixel/ToF pair has unique (Qx, Qz). Coordinates cannot be reduced to 1D arrays. Different run files may produce surfaces with different column counts.
 
+## File search architecture (sshfs performance)
+
+Run-file lookup uses parallel `os.path.isfile` checks instead of `glob.glob`:
+- `_find_file_in_ipts(data_base, candidates, timeout)` in `src/quicknxs/interfaces/data_handling/filepath.py`
+- `Instrument.locate_file(run_number, histogram, timeout)` in `instrument.py` — builds candidate list and delegates
+
+**Test gotcha:** `conftest.py` overrides `Instrument.file_search_template` at module level, but
+`instrument_dir` (used by `locate_file`) is **not** overridden.  Tests for `locate_file` must
+mock `_find_file_in_ipts` at its import site in `instrument.py`:
+```python
+mocker.patch("quicknxs.interfaces.data_handling.instrument._find_file_in_ipts", return_value=...)
+```
+Do **not** patch `filepath._find_file_in_ipts` — that won't affect `locate_file`.
+
+**`test_diagnostic_data.py`**: 4 pre-existing failures unrelated to file search (as of 2026-03-29).
+
 ## GitHub Actions gotchas (cross-project lessons)
 - `GITHUB_TOKEN` pushes are silenced by GitHub's anti-loop protection; any
   workflow creating a branch that needs CI to run on it must use a PAT instead
