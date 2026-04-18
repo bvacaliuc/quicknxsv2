@@ -101,10 +101,27 @@ with gouraud shading, `imshow` origin round-trip, label location on
 `setup/patterns/ui-aspects.md` — the pitfalls there were characterised on
 this codebase and apply in full.
 
-## GitHub Actions gotchas (cross-project lessons)
-- `GITHUB_TOKEN` pushes are silenced by GitHub's anti-loop protection; any
-  workflow creating a branch that needs CI to run on it must use a PAT instead
-- `workflow_dispatch` check runs do **not** satisfy PR branch protection —
-  only `push`/`pull_request` event check runs count
-- Enable `delete_branch_on_merge` to avoid stale branch accumulation:
-  `PATCH /repos/neutrons/quicknxs {"delete_branch_on_merge": true}`
+## Off-specular / GISANS data shape (data-processing learning)
+
+The reason the pcolormesh plots here use `shading="gouraud"` with 2D
+coordinate arrays (and not 1D edges) is **not** a cosmetic choice — it
+reflects the underlying reduction output:
+
+- Off-specular and GISANS Q-space output is **inherently irregular**.
+  Each `(detector pixel, time-of-flight bin)` cell maps to a unique
+  `(Qx, Qz)` (or `(Qx, Qy)` for GISANS), because Q depends on both
+  scattering angle and wavelength. There is no 1D x-axis and no 1D
+  y-axis that the grid aligns to — the coordinates are fundamentally 2D.
+- **Different runs produce surfaces with different column counts** (the
+  ToF binning or pixel masking can vary run-to-run). Any code that
+  overlays or exports multiple runs must keep each run's mesh separate;
+  you cannot concatenate onto a shared coordinate axis.
+- **Do not try to collapse to 1D.** A "helpful" refactor that replaces
+  the 2D coordinate arrays with 1D edges will silently corrupt any
+  pixel whose Q-vector doesn't lie on the assumed regular grid — and
+  that is every pixel in off-specular analysis.
+- The matplotlib-side consequences (how `get_coordinates` /
+  `get_array` behave, what export code has to carry) are in
+  `setup/patterns/ui-aspects.md`. The fact above is the *reason* those
+  matplotlib rules matter; keep them in sync if the reduction output
+  shape ever changes.
