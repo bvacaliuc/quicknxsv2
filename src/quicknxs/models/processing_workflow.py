@@ -539,16 +539,6 @@ class ProcessingWorkflow:
             logging.error("List of cross-sections is empty")
             return data_dict
 
-        first_state = self.data_manager.reduction_states[0]
-        p_0 = [
-            item.cross_sections[first_state].configuration.cut_first_n_points
-            for item in self.data_manager.reduction_list
-        ]
-        p_n = [
-            item.cross_sections[first_state].configuration.cut_last_n_points
-            for item in self.data_manager.reduction_list
-        ]
-
         ki_max = 0.01
         for pol_state in self.data_manager.reduction_states:
             # The scaling factors should have been determined at this point. Just use them
@@ -561,20 +551,17 @@ class ProcessingWorkflow:
                 Qx, Qz, ki_z, kf_z, S, dS = (offspec.Qx, offspec.Qz, offspec.ki_z, offspec.kf_z, offspec.S, offspec.dS)
 
                 try:
-                    n_total = len(S[0])
-                    # P_0 and P_N are the number of points to cut in TOF on each side
-                    p_0 = item.cross_sections[pol_state].configuration.cut_first_n_points
-                    p_n = n_total - item.cross_sections[pol_state].configuration.cut_last_n_points
+                    trim = off_specular.tof_trim_slice(item.cross_sections[pol_state].configuration, len(S[0]))
 
                     rdata = np.array(
                         [
-                            Qx[:, p_0:p_n],
-                            Qz[:, p_0:p_n],
-                            ki_z[:, p_0:p_n],
-                            kf_z[:, p_0:p_n],
-                            ki_z[:, p_0:p_n] - kf_z[:, p_0:p_n],
-                            S[:, p_0:p_n],
-                            dS[:, p_0:p_n],
+                            Qx[:, trim],
+                            Qz[:, trim],
+                            ki_z[:, trim],
+                            kf_z[:, trim],
+                            ki_z[:, trim] - kf_z[:, trim],
+                            S[:, trim],
+                            dS[:, trim],
                         ]
                     ).transpose((1, 2, 0))
                     combined_data.append(rdata)

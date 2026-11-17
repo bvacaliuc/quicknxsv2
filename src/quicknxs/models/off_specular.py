@@ -12,6 +12,7 @@ from quicknxs.enums import OffSpecXAxis
 from quicknxs.models.configuration import get_direct_beam_low_res_roi
 
 if TYPE_CHECKING:
+    from quicknxs.models.configuration import Configuration
     from quicknxs.models.data_set import CrossSectionData, NexusData
 
 H_OVER_M_NEUTRON = 3.956034e-7  # h/m_n [m^2/s]
@@ -133,6 +134,24 @@ class OffSpecular:
             self.dS[:, np.logical_not(idxs)] = 0.0
 
 
+def tof_trim_slice(configuration: "Configuration", n_tof: int) -> slice:
+    """Slice of the TOF axis kept after cutting the first/last points of a run.
+
+    The off-specular arrays are indexed ``[pixel][TOF]`` with TOF ascending, so Q *descends*
+    along the TOF axis. ``cut_first_n_points`` and ``cut_last_n_points`` count points of the
+    reflectivity curve from its low-Q and high-Q end respectively, hence the first points are
+    cut from the end of the TOF axis and the last points from its start.
+
+    Parameters
+    ----------
+    configuration:
+        Configuration of the run, holding ``cut_first_n_points`` and ``cut_last_n_points``
+    n_tof:
+        Number of TOF bins
+    """
+    return slice(configuration.cut_last_n_points, n_tof - configuration.cut_first_n_points)
+
+
 def merge(reduction_list: list["NexusData"], pol_state: str) -> tuple[np.ndarray, ...]:
     """Merge the off-specular data from a reduction list.
 
@@ -154,17 +173,15 @@ def merge(reduction_list: list["NexusData"], pol_state: str) -> tuple[np.ndarray
         Qx, Qz, ki_z, kf_z, S, dS = (offspec.Qx, offspec.Qz, offspec.ki_z, offspec.kf_z, offspec.S, offspec.dS)
 
         try:
-            n_total = len(S[0])
-            p_0 = item.cross_sections[pol_state].configuration.cut_first_n_points
-            p_n = n_total - item.cross_sections[pol_state].configuration.cut_last_n_points
+            trim = tof_trim_slice(item.cross_sections[pol_state].configuration, len(S[0]))
 
-            # NOTE: need to unravel the arrays from [TOF][pixel] to [q_points]
-            Qx = np.ravel(Qx[:, p_0:p_n])
-            Qz = np.ravel(Qz[:, p_0:p_n])
-            ki_z = np.ravel(ki_z[:, p_0:p_n])
-            kf_z = np.ravel(kf_z[:, p_0:p_n])
-            S = np.ravel(S[:, p_0:p_n])
-            dS = np.ravel(dS[:, p_0:p_n])
+            # NOTE: need to unravel the arrays from [pixel][TOF] to [q_points]
+            Qx = np.ravel(Qx[:, trim])
+            Qz = np.ravel(Qz[:, trim])
+            ki_z = np.ravel(ki_z[:, trim])
+            kf_z = np.ravel(kf_z[:, trim])
+            S = np.ravel(S[:, trim])
+            dS = np.ravel(dS[:, trim])
 
             _qx = np.concatenate((_qx, Qx))
             _qz = np.concatenate((_qz, Qz))

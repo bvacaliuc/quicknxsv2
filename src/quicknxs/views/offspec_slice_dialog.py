@@ -6,6 +6,7 @@ from numpy import float64
 from numpy.typing import NDArray
 from qtpy import QtCore, QtWidgets
 
+from quicknxs.models.off_specular import tof_trim_slice
 from quicknxs.presenters.data_manager import DataManager
 from quicknxs.views import load_ui
 from quicknxs.views.widgets import MPLWidget
@@ -116,16 +117,13 @@ class OffSpecSliceDialog(QtWidgets.QDialog):
             offspec = item.cross_sections[first_state].off_spec
             Qx, Qz, ki_z, kf_z, I, _ = (offspec.Qx, offspec.Qz, offspec.ki_z, offspec.kf_z, offspec.S, offspec.dS)
 
-            n_total = len(I[0])
-            # P_0 and P_N are the number of points to cut in TOF on each side
-            p_0 = item.cross_sections[first_state].configuration.cut_first_n_points
-            p_n = n_total - item.cross_sections[first_state].configuration.cut_last_n_points
+            trim = tof_trim_slice(item.cross_sections[first_state].configuration, len(I[0]))
 
-            Qx = Qx[:, p_0:p_n]
-            Qz = Qz[:, p_0:p_n]
-            ki_z = ki_z[:, p_0:p_n]
-            kf_z = kf_z[:, p_0:p_n]
-            I = I[:, p_0:p_n]
+            Qx = Qx[:, trim]
+            Qz = Qz[:, trim]
+            ki_z = ki_z[:, trim]
+            kf_z = kf_z[:, trim]
+            I = I[:, trim]
 
             # Extend the X and Y limits of the plotting area
             try:
