@@ -119,7 +119,8 @@ class OffSpecSliceDialog(QtWidgets.QDialog):
             n_total = len(I[0])
             # P_0 and P_N are the number of points to cut in TOF on each side
             p_0 = item.cross_sections[first_state].configuration.cut_first_n_points
-            p_n = n_total - item.cross_sections[first_state].configuration.cut_last_n_points
+            p_n = n_total - p_0
+            # FIXME: see also note in models/processing_workflow.py
 
             Qx = Qx[:, p_0:p_n]
             Qz = Qz[:, p_0:p_n]

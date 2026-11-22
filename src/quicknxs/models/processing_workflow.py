@@ -540,6 +540,7 @@ class ProcessingWorkflow:
             return data_dict
 
         first_state = self.data_manager.reduction_states[0]
+        # FIXME: why do we create p_0, p_n here as lists only to override them as scalars in the loop below?
         p_0 = [
             item.cross_sections[first_state].configuration.cut_first_n_points
             for item in self.data_manager.reduction_list
@@ -564,7 +565,8 @@ class ProcessingWorkflow:
                     n_total = len(S[0])
                     # P_0 and P_N are the number of points to cut in TOF on each side
                     p_0 = item.cross_sections[pol_state].configuration.cut_first_n_points
-                    p_n = n_total - item.cross_sections[pol_state].configuration.cut_last_n_points
+                    p_n = n_total - p_0
+                    # FIXME: this seems to *ignore* the NR entry made in the table which involves
 
                     rdata = np.array(
                         [

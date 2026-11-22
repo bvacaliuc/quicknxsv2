@@ -156,7 +156,8 @@ def merge(reduction_list: list["NexusData"], pol_state: str) -> tuple[np.ndarray
         try:
             n_total = len(S[0])
             p_0 = item.cross_sections[pol_state].configuration.cut_first_n_points
-            p_n = n_total - item.cross_sections[pol_state].configuration.cut_last_n_points
+            p_n = n_total - p_0
+            # FIXME: see also note in processing_workflow.py
 
             # NOTE: need to unravel the arrays from [TOF][pixel] to [q_points]
             Qx = np.ravel(Qx[:, p_0:p_n])
