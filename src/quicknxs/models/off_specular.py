@@ -156,16 +156,17 @@ def merge(reduction_list: list["NexusData"], pol_state: str) -> tuple[np.ndarray
         try:
             n_total = len(S[0])
             p_0 = item.cross_sections[pol_state].configuration.cut_first_n_points
-            p_n = n_total - p_0
-            # FIXME: see also note in processing_workflow.py
+            p_n = item.cross_sections[pol_state].configuration.cut_last_n_points
+            n_minus_p0 = n_total - p_0
+            # NB: see also note in processing_workflow.py
 
             # NOTE: need to unravel the arrays from [TOF][pixel] to [q_points]
-            Qx = np.ravel(Qx[:, p_0:p_n])
-            Qz = np.ravel(Qz[:, p_0:p_n])
-            ki_z = np.ravel(ki_z[:, p_0:p_n])
-            kf_z = np.ravel(kf_z[:, p_0:p_n])
-            S = np.ravel(S[:, p_0:p_n])
-            dS = np.ravel(dS[:, p_0:p_n])
+            Qx = np.ravel(Qx[:, p_n:n_minus_p0])
+            Qz = np.ravel(Qz[:, p_n:n_minus_p0])
+            ki_z = np.ravel(ki_z[:, p_n:n_minus_p0])
+            kf_z = np.ravel(kf_z[:, p_n:n_minus_p0])
+            S = np.ravel(S[:, p_n:n_minus_p0])
+            dS = np.ravel(dS[:, p_n:n_minus_p0])
 
             _qx = np.concatenate((_qx, Qx))
             _qz = np.concatenate((_qz, Qz))
