@@ -482,8 +482,9 @@ class PlotView:
                 selected_data = nexus_data.cross_sections[xs]
                 progress(i_run + i / 4.0, message=f"Processed run {selected_data.run_number} {xs}", out_of=n_total)
 
-                PN = len(selected_data.tof) - selected_data.configuration.cut_first_n_points
-                P0 = selected_data.configuration.cut_last_n_points
+                P0 = selected_data.configuration.cut_first_n_points
+                PN = selected_data.configuration.cut_last_n_points
+                N_MINUS_P0 = len(selected_data.tof) - P0
                 ki_z, kf_z = selected_data.off_spec.ki_z, selected_data.off_spec.kf_z
                 Qx, Qz, S = selected_data.off_spec.Qx, selected_data.off_spec.Qz, selected_data.off_spec.S
                 try:
@@ -502,9 +503,9 @@ class PlotView:
                     continue
                 if self.main_window.ui.kizmkfzVSqz.isChecked():
                     plot.pcolormesh(
-                        (ki_z - kf_z)[:, P0:PN],
-                        Qz[:, P0:PN],
-                        S[:, P0:PN],
+                        (ki_z - kf_z)[:, PN:N_MINUS_P0],
+                        Qz[:, PN:N_MINUS_P0],
+                        S[:, PN:N_MINUS_P0],
                         log=True,
                         imin=i_min,
                         imax=i_max,
@@ -513,9 +514,9 @@ class PlotView:
                     )
                 elif self.main_window.ui.qxVSqz.isChecked():
                     plot.pcolormesh(
-                        Qx[:, P0:PN],
-                        Qz[:, P0:PN],
-                        S[:, P0:PN],
+                        Qx[:, PN:N_MINUS_P0],
+                        Qz[:, PN:N_MINUS_P0],
+                        S[:, PN:N_MINUS_P0],
                         log=True,
                         imin=i_min,
                         imax=i_max,
@@ -524,9 +525,9 @@ class PlotView:
                     )
                 else:
                     plot.pcolormesh(
-                        ki_z[:, P0:PN],
-                        kf_z[:, P0:PN],
-                        S[:, P0:PN],
+                        ki_z[:, PN:N_MINUS_P0],
+                        kf_z[:, PN:N_MINUS_P0],
+                        S[:, PN:N_MINUS_P0],
                         log=True,
                         imin=i_min,
                         imax=i_max,
@@ -681,9 +682,13 @@ class PlotView:
 
         ymin = 1.5
         ymax = 1e-7
+        # NB: reflectivity extraction uses [P0:N-PN] according to the UI
+        # See also the Off-Specular dialogs which use [PN:N-P0] when extracting data sets
+        # See also the note in models/processing_workflow.py regarding the Off-Specular RAW
         P0 = self.main_window.ui.rangeStart.value()
-        PN = len(self.main_window.data_manager.active_cross_section.q) - self.main_window.ui.rangeEnd.value()
-        ynormed = self.main_window.data_manager.active_cross_section.r[P0:PN]
+        PN = self.main_window.ui.rangeEnd.value()
+        N_MINUS_PN = len(self.main_window.data_manager.active_cross_section.q) - PN
+        ynormed = self.main_window.data_manager.active_cross_section.r[P0:N_MINUS_PN]
         if len(ynormed[ynormed > 0]) < 2:
             self._plot_message(self.main_window.ui.refl, "No points to show\nin active dataset!")
             return False
@@ -691,9 +696,9 @@ class PlotView:
         ymin = min(ymin, ynormed[ynormed > 0].min())
         ymax = _set_ymax(ymax, ynormed)
         self.main_window.ui.refl.errorbar(
-            self.main_window.data_manager.active_cross_section.q[P0:PN],
+            self.main_window.data_manager.active_cross_section.q[P0:N_MINUS_PN],
             ynormed,
-            yerr=self.main_window.data_manager.active_cross_section.dr[P0:PN],
+            yerr=self.main_window.data_manager.active_cross_section.dr[P0:N_MINUS_PN],
             label="Active",
             lw=2,
             capsize=1,
@@ -705,8 +710,9 @@ class PlotView:
             if refli.cross_sections[xs_name].q is None:
                 continue
             P0i = refli.cross_sections[xs_name].configuration.cut_first_n_points
-            PNi = len(refli.cross_sections[xs_name].q) - refli.cross_sections[xs_name].configuration.cut_last_n_points
-            ynormed = refli.cross_sections[xs_name].r[P0i:PNi]
+            PNi = refli.cross_sections[xs_name].configuration.cut_last_n_points
+            N_MINUS_PNi = len(refli.cross_sections[xs_name].q) - PNi
+            ynormed = refli.cross_sections[xs_name].r[P0i:N_MINUS_PNi]
             try:
                 ymin = min(ymin, ynormed[ynormed > 0].min())
             except ValueError:
@@ -716,9 +722,9 @@ class PlotView:
             except ValueError:
                 pass
             self.main_window.ui.refl.errorbar(
-                refli.cross_sections[xs_name].q[P0i:PNi],
+                refli.cross_sections[xs_name].q[P0i:N_MINUS_PNi],
                 ynormed,
-                yerr=refli.cross_sections[xs_name].dr[P0i:PNi],
+                yerr=refli.cross_sections[xs_name].dr[P0i:N_MINUS_PNi],
                 label=str(refli.run_number),
                 capsize=1,
                 color=self._refl_color_list[i % len(self._refl_color_list)],
