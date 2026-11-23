@@ -566,7 +566,18 @@ class ProcessingWorkflow:
                     # P_0 and P_N are the number of points to cut in TOF on each side
                     p_0 = item.cross_sections[pol_state].configuration.cut_first_n_points
                     p_n = n_total - p_0
-                    # FIXME: this seems to *ignore* the NR entry made in the table which involves
+                    # FIXME: this seems to *ignore* the NR entry made in the table
+                    # An agentic review (with data analysis against RAW XYE export) reported:
+                    #
+                    #    offspec 07: session9 reference check; name the P0-at-both-ends trim
+                    #
+                    #    The combined build fix-offspec-raw-export (trim + header fixes) reproduces
+                    #    the declared-correct preview export of session9 point for point and passes
+                    #    the file checks. fix-inverted-p0-pn cuts P0 from both ends and ignores PN:
+                    #    right at low Q, wrong at high Q whenever NL != NR. classify_trim now names
+                    #    that pattern instead of 'neither'.
+                    #    
+                    #    Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
 
                     rdata = np.array(
                         [
