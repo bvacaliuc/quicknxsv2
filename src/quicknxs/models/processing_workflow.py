@@ -552,6 +552,7 @@ class ProcessingWorkflow:
             return data_dict
 
         first_state = self.data_manager.reduction_states[0]
+        # FIXME: why do we create p_0, p_n here as lists only to override them as scalars in the loop below?
         p_0 = [
             item.cross_sections[first_state].configuration.cut_first_n_points
             for item in self.data_manager.reduction_list
@@ -576,17 +577,21 @@ class ProcessingWorkflow:
                     n_total = len(S[0])
                     # P_0 and P_N are the number of points to cut in TOF on each side
                     p_0 = item.cross_sections[pol_state].configuration.cut_first_n_points
-                    p_n = n_total - item.cross_sections[pol_state].configuration.cut_last_n_points
+                    p_n = item.cross_sections[pol_state].configuration.cut_last_n_points
+                    n_minus_p0 = n_total - p_0
+                    # NB: analysis found a *difference* between offspecular preview
+                    # and offspecular export coded in the QuickNXS v1->v2 transition; see:
+                    # https://code.ornl.gov/6ov/tasking/-/blob/quicknxsv2-offspecular/plan/quicknxsv2-offspecular/06-raw-offspec-pipeline-across-versions.md?ref_type=heads#what-changed-between-versions
 
                     rdata = np.array(
                         [
-                            Qx[:, p_0:p_n],
-                            Qz[:, p_0:p_n],
-                            ki_z[:, p_0:p_n],
-                            kf_z[:, p_0:p_n],
-                            ki_z[:, p_0:p_n] - kf_z[:, p_0:p_n],
-                            S[:, p_0:p_n],
-                            dS[:, p_0:p_n],
+                            Qx[:, p_n:n_minus_p0],
+                            Qz[:, p_n:n_minus_p0],
+                            ki_z[:, p_n:n_minus_p0],
+                            kf_z[:, p_n:n_minus_p0],
+                            ki_z[:, p_n:n_minus_p0] - kf_z[:, p_n:n_minus_p0],
+                            S[:, p_n:n_minus_p0],
+                            dS[:, p_n:n_minus_p0],
                         ]
                     ).transpose((1, 2, 0))
                     combined_data.append(rdata)
@@ -770,10 +775,11 @@ class ProcessingWorkflow:
             for i, ws in enumerate(ws_list):
                 _x = ws.readX(0)
                 n_total = len(_x)
-                x = ws.readX(0)[p_0[i] : n_total - p_n[i]]
-                y = ws.readY(0)[p_0[i] : n_total - p_n[i]]
-                dy = ws.readE(0)[p_0[i] : n_total - p_n[i]]
-                dx = ws.readDx(0)[p_0[i] : n_total - p_n[i]]
+                # NB: see note above regarding [P0:N-PN] vs [PN:N-P0]
+                x = ws.readX(0)[p_n[i] : n_total - p_0[i]]
+                y = ws.readY(0)[p_n[i] : n_total - p_0[i]]
+                dy = ws.readE(0)[p_n[i] : n_total - p_0[i]]
+                dx = ws.readDx(0)[p_n[i] : n_total - p_0[i]]
                 # This should be actual theta calculated
                 tth_value = ws.getRun().getProperty("two_theta").value / 2.0 * np.pi / 180.0
                 # tth_value = ws.getRun().getProperty("SANGLE").getStatistics().mean * math.pi / 180.0

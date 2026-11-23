@@ -118,14 +118,16 @@ class OffSpecSliceDialog(QtWidgets.QDialog):
 
             n_total = len(I[0])
             # P_0 and P_N are the number of points to cut in TOF on each side
-            p_0 = item.cross_sections[first_state].configuration.cut_first_n_points
-            p_n = n_total - item.cross_sections[first_state].configuration.cut_last_n_points
+            p_0 = item.cross_sections[pol_state].configuration.cut_first_n_points
+            p_n = item.cross_sections[pol_state].configuration.cut_last_n_points
+            n_minus_p0 = n_total - p_0
+            # NB: see also note in models/processing_workflow.py
 
-            Qx = Qx[:, p_0:p_n]
-            Qz = Qz[:, p_0:p_n]
-            ki_z = ki_z[:, p_0:p_n]
-            kf_z = kf_z[:, p_0:p_n]
-            I = I[:, p_0:p_n]
+            Qx = Qx[:, p_n:n_minus_p0]
+            Qz = Qz[:, p_n:n_minus_p0]
+            ki_z = ki_z[:, p_n:n_minus_p0]
+            kf_z = kf_z[:, p_n:n_minus_p0]
+            I = I[:, p_n:n_minus_p0]
 
             # Extend the X and Y limits of the plotting area
             try:
