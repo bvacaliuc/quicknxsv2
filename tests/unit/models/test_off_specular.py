@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from quicknxs.models.configuration import Configuration
-from quicknxs.models.off_specular import merge
+from quicknxs.models.off_specular import merge, tof_trim_slice
 from quicknxs.models.processing_workflow import ProcessingWorkflow
 from quicknxs.presenters.data_manager import DataManager
 
@@ -47,6 +47,12 @@ def _fake_run(n_pix: int, n_tof: int, cut_first: int, cut_last: int):
     return SimpleNamespace(cross_sections={"Off_Off": xs}, run_number="1")
 
 
+def test_tof_trim_slice():
+    """`cut_first_n_points` counts from low Q, which is the long-TOF end of a [pixel][TOF] array."""
+    configuration = SimpleNamespace(cut_first_n_points=2, cut_last_n_points=5)
+    assert tof_trim_slice(configuration, 20) == slice(5, 18)
+
+
 def test_merge_cuts_first_points_at_low_q():
     """The "first" points of a run are its lowest-Q points, as in the reflectivity curve."""
     n_tof, cut_first, cut_last = 20, 2, 5
@@ -72,7 +78,7 @@ def test_raw_export_trim_matches_merge(mocker):
 
 @pytest.mark.datarepo
 def test_off_specular_tof_axis_runs_from_high_to_low_q(data_server):
-    """Guard the premise of the trim: ki_z decreases along the TOF axis of the off-specular arrays."""
+    """Guard the premise of `tof_trim_slice`: ki_z decreases along the TOF axis of the off-specular arrays."""
     manager = DataManager(data_server.directory)
     manager.load(data_server.path_to("REF_M_42112"), Configuration())
     xs = manager.active_cross_section

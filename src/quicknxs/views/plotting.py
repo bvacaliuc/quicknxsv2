@@ -4,6 +4,7 @@ import sys
 import numpy as np
 
 from quicknxs.models.data_set import CrossSectionData
+from quicknxs.models.off_specular import tof_trim_slice
 from quicknxs.views.widgets.mplwidget import MPLWidget
 
 
@@ -482,8 +483,7 @@ class PlotView:
                 selected_data = nexus_data.cross_sections[xs]
                 progress(i_run + i / 4.0, message=f"Processed run {selected_data.run_number} {xs}", out_of=n_total)
 
-                PN = len(selected_data.tof) - selected_data.configuration.cut_first_n_points
-                P0 = selected_data.configuration.cut_last_n_points
+                trim = tof_trim_slice(selected_data.configuration, len(selected_data.tof))
                 ki_z, kf_z = selected_data.off_spec.ki_z, selected_data.off_spec.kf_z
                 Qx, Qz, S = selected_data.off_spec.Qx, selected_data.off_spec.Qz, selected_data.off_spec.S
                 try:
@@ -502,9 +502,9 @@ class PlotView:
                     continue
                 if self.main_window.ui.kizmkfzVSqz.isChecked():
                     plot.pcolormesh(
-                        (ki_z - kf_z)[:, P0:PN],
-                        Qz[:, P0:PN],
-                        S[:, P0:PN],
+                        (ki_z - kf_z)[:, trim],
+                        Qz[:, trim],
+                        S[:, trim],
                         log=True,
                         imin=i_min,
                         imax=i_max,
@@ -513,9 +513,9 @@ class PlotView:
                     )
                 elif self.main_window.ui.qxVSqz.isChecked():
                     plot.pcolormesh(
-                        Qx[:, P0:PN],
-                        Qz[:, P0:PN],
-                        S[:, P0:PN],
+                        Qx[:, trim],
+                        Qz[:, trim],
+                        S[:, trim],
                         log=True,
                         imin=i_min,
                         imax=i_max,
@@ -524,9 +524,9 @@ class PlotView:
                     )
                 else:
                     plot.pcolormesh(
-                        ki_z[:, P0:PN],
-                        kf_z[:, P0:PN],
-                        S[:, P0:PN],
+                        ki_z[:, trim],
+                        kf_z[:, trim],
+                        S[:, trim],
                         log=True,
                         imin=i_min,
                         imax=i_max,

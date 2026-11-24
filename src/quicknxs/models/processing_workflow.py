@@ -539,16 +539,6 @@ class ProcessingWorkflow:
             logging.error("List of cross-sections is empty")
             return data_dict
 
-        first_state = self.data_manager.reduction_states[0]
-        p_0 = [
-            item.cross_sections[first_state].configuration.cut_first_n_points
-            for item in self.data_manager.reduction_list
-        ]
-        p_n = [
-            item.cross_sections[first_state].configuration.cut_last_n_points
-            for item in self.data_manager.reduction_list
-        ]
-
         ki_max = 0.01
         for pol_state in self.data_manager.reduction_states:
             # The scaling factors should have been determined at this point. Just use them
@@ -561,21 +551,17 @@ class ProcessingWorkflow:
                 Qx, Qz, ki_z, kf_z, S, dS = (offspec.Qx, offspec.Qz, offspec.ki_z, offspec.kf_z, offspec.S, offspec.dS)
 
                 try:
-                    n_total = len(S[0])
-                    # TOF ascends along the arrays, so Q descends: the last (high-Q) points of the
-                    # reflectivity curve are cut from the start and the first (low-Q) points from the end
-                    tof_start = item.cross_sections[pol_state].configuration.cut_last_n_points
-                    tof_stop = n_total - item.cross_sections[pol_state].configuration.cut_first_n_points
+                    trim = off_specular.tof_trim_slice(item.cross_sections[pol_state].configuration, len(S[0]))
 
                     rdata = np.array(
                         [
-                            Qx[:, tof_start:tof_stop],
-                            Qz[:, tof_start:tof_stop],
-                            ki_z[:, tof_start:tof_stop],
-                            kf_z[:, tof_start:tof_stop],
-                            ki_z[:, tof_start:tof_stop] - kf_z[:, tof_start:tof_stop],
-                            S[:, tof_start:tof_stop],
-                            dS[:, tof_start:tof_stop],
+                            Qx[:, trim],
+                            Qz[:, trim],
+                            ki_z[:, trim],
+                            kf_z[:, trim],
+                            ki_z[:, trim] - kf_z[:, trim],
+                            S[:, trim],
+                            dS[:, trim],
                         ]
                     ).transpose((1, 2, 0))
                     combined_data.append(rdata)
